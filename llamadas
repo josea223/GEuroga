@@ -1,0 +1,168 @@
+#!/bin/bash
+
+# Archivo: /usr/local/bin/llamadas
+# --------------------------------------------- ------	------	#
+# Búsqueda global de llamadas y logs de contactos		#
+# La búsqueda se inicia en la carpeta de Contactos		#
+# --------------------------------------------- ------	-------	#
+
+## HECHO
+
+
+## PENDIENTE
+# No funciona la opción de mover los archivos a Contatos/privado. Comprobar el código de ncontacto
+
+## PARÁMETROS
+# cadena de búsqueda de archivo
+cadena=$1
+
+## CONFIGURACIÓN
+clear
+
+cd /mnt/Datos/Compartir/Servidor/Contactos/
+echo "$PWD"
+
+# VARIABLES
+RA_contactos="/mnt/Datos/Compartir/Servidor/Contactos/"
+
+
+# TEXTOS
+TXT_selec="\nSelecciona la conversación a registrar:\n"
+TXT_nolog="No existen registros de llamada\n"
+TXT_nolla="La carpeta no contine grabaciones de llamada\n"
+TXT_regis="Listado de llamadas:\n"
+
+## FUNCIONES
+
+# Recoge los valores a solicitar del registro
+function registro {
+ printf "
+Tipo de consulta:
+ [1] Consulta de propiedad
+ [2] Gestión de propiedad
+ [3] Sin información suficiente (se ha cortado, llamada perdida ...)
+ [4] Otras gestiones de propiedades [documentación, firma ...]
+ [5] Proveedores
+ [6] Administración
+ [7] Otros
+ [9] Mover
+ [0] Borrar
+
+"
+ read consulta_num
+ printf "\n"
+  
+# Mover conversación
+ if [ "$consulta_num" = 9 ]; then mv "$archivo" /mnt/Datos/Compartir/Servidor/Contactos/privado/$archivo_l; exit; fi
+
+# Borrar conversación
+ if [ "$consulta_num" = 0 ]; then rm "$archivo"; exit; fi
+
+# Registrar conversación
+read -p "Alias, apodo >> " apodo
+ read -p "Nombre del contacto >> " nombre
+ read -p "Apellidos del contacto >> " apellidos
+ read -p "Propiedades consultadas [Separar con espacio] >> " propiedades
+ read -p "Detalles de la conversación >> " detalles
+
+}
+
+# Selección del tipo de consulta
+# Por el momento no lo voy a utilizar.
+# Prefiero guardar el código y hacer las búsquedas sobre el código
+function tipo {
+ case "$consulta_num" in
+	1) consulta="Compra";;
+	2) consulta="Vende";;
+	3) consulta="ComprayVende";;
+	4) consulta="Otros";;
+	*) echo "Error en la selección"; consulta="Error"
+ esac
+}
+# -----------------------------------------------------
+
+
+## CÓDIGO
+
+printf "$TXT_selec"
+printf "$TXT_regis"
+
+k=0
+while IFS= read -r registro
+do
+  (( k = $k + 1 ))
+  llamada[$k]=${registro##*/Contactos}
+#  llamada[$k]=${registro}
+  if [ -f "${registro%.*}.log" ]; then
+   printf "\e[91m [%d] %s \e[0m\n" $k "${llamada[$k]}"
+  else
+   printf " [%d] %s \n" $k "${llamada[$k]}"
+  fi
+done < <(find $RA_contactos -name *$1*.amr -type f)
+
+
+# Doy la opción de salir
+printf "\e[92m [0] Salir \e[0m\n"
+
+# echo "[1] ${llamada[1]}"	# Puede que tuviera sentido antes para realizar alguna prueba
+
+
+
+# Recojo el registro que quiero crear
+read -n 1 num
+printf "\n"
+# Si selecciono 0 termino el programa
+[ "$num" = 0 ] && exit
+
+# Formateo el nombre de las variables
+# Ruta relativa del archivo desde /Contactos ...
+archivo=".${llamada[$num]}"
+# Nombre del archivo
+archivo_l="${archivo#./}"
+# Nombre del archivo sin la extensión
+archivo_ne="${archivo%.*}"
+# Número de teléfono del archivo
+telefono="${archivo_ne##*_}"
+
+# Elijo si quiero escuchar el audio o no.
+# Si selecciono escuchar la conversación no puedo trabajar con el script hasta que cierro el programa de audio
+printf "Escuchar el audio $archivo [si/no]\n"
+read escuchar_sn
+if [ "$escuchar_sn" = 'si' ]; then printf "\nPulsar Alt+F4 para continuar\n"; totem "$archivo"; fi
+
+# COMPROBACIÓN: Imprimo en pantalla el número de teléfono.
+# Se puede eliminar
+printf "\nTeléfono: %s\n" $telefono
+
+# Selecciono acción según exista ya un log o no
+
+# Existe log
+# Saco los datos por pantalla
+if [ -f "$archivo_ne.log" ]; then
+printf "\n Contacto ya registrado \n\n\e[91m"
+cat "$archivo_ne.log"
+printf "\e[0m\n"
+
+# Pregunto si borro el log para crear uno nuevo
+printf "Borrar el registro [si/no]\n"
+read borrar_sn
+ if [ "$borrar_sn" = 'si' ]; then rm "$archivo_ne.log";
+ else exit
+ fi
+fi
+
+# Creo el archivo e introduzco los primeros datos.
+# funcion de registro
+registro
+# funcion para catalogar el contenido de la llamada.
+# tipo
+
+# Introduzco los datos en el archivo
+printf "Tipo: %s\nApodo: %s\nNombre: %s\nApellidos: %s\nTeléfono: %s\nPropiedades: %s\nDetalles: %s\n" "$consulta_num" "$apodo" "$nombre" "$apellidos" "$telefono" "$propiedades" "$detalles" > "$archivo_ne.log"
+
+# Muestro en pantalla el nuevo registro
+printf "Registro completado!!! :D\n"
+sleep 1
+printf "\n\e[32m"
+cat "$archivo_ne.log"
+printf "\e[0m\n"
